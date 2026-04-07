@@ -5,6 +5,7 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtStrategy } from './jwt.strategy';
 import { GoogleStrategy } from './google.strategy';
+import { GoogleController } from './google.controller';
 import { UsersModule } from '../users/users.module';
 import { CedulaModule } from '../cedula/cedula.module';
 
@@ -18,7 +19,7 @@ import { CedulaModule } from '../cedula/cedula.module';
       signOptions: { expiresIn: '7d' },
     }),
   ],
-  controllers: [AuthController],
+  controllers: [AuthController, GoogleController],
   providers: [AuthService, JwtStrategy, GoogleStrategy],
   exports: [JwtModule],
 })
