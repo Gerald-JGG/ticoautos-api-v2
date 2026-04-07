@@ -26,4 +26,13 @@ export class AuthController {
   getMe(@CurrentUser() user: UserDocument) {
     return user;
   }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('complete-profile')
+  async completeProfile(
+  @CurrentUser() user: UserDocument,
+  @Body() body: { cedula: string; name: string },
+  ) {
+    return this.authService.completeGoogleProfile(user._id.toString(), body.cedula, body.name);
+  }
 }
