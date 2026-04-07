@@ -28,4 +28,35 @@ export class UsersService {
     if (!user) throw new NotFoundException('User not found');
     return user;
   }
+
+  async findOrCreateGoogle(profile: {
+  googleId: string;
+  email: string;
+  name: string;
+}): Promise<UserDocument> {
+  let user = await this.userModel.findOne({ googleId: profile.googleId });
+  if (user) return user;
+
+  user = await this.userModel.findOne({ email: profile.email });
+  if (user) {
+    user.googleId = profile.googleId;
+    return user.save();
+  }
+
+  const newUser = new this.userModel({
+    googleId: profile.googleId,
+    email: profile.email,
+    name: profile.name,
+    password: null,
+  });
+  return newUser.save();
+}
+
+async updateCedula(userId: string, cedula: string, name: string): Promise<UserDocument> {
+  const user = await this.userModel.findById(userId);
+  if (!user) throw new NotFoundException('User not found');
+  user.cedula = cedula;
+  user.name = name;
+  return user.save();
+}
 }
