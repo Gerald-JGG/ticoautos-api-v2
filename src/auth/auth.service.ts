@@ -4,15 +4,18 @@ import * as bcrypt from 'bcryptjs';
 import { UsersService } from '../users/users.service';
 import { CreateUserDto } from '../users/dto/create-user.dto';
 import { LoginDto } from './dto/login.dto';
+import { CedulaService } from '../cedula/cedula.service';
 
 @Injectable()
 export class AuthService {
   constructor(
     private usersService: UsersService,
     private jwtService: JwtService,
+    private cedulaService: CedulaService,
   ) {}
 
   async register(createUserDto: CreateUserDto) {
+    await this.cedulaService.validate(createUserDto.cedula);
     const user = await this.usersService.create(createUserDto);
     const token = this.generateToken(user._id.toString(), user.email);
     return { user, token };
