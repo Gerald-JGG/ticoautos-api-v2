@@ -16,6 +16,9 @@ export class User {
 
   @Prop({ default: null })
   phone: string;
+
+  @Prop({ required: false, trim: true })
+  cedula: string;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);
