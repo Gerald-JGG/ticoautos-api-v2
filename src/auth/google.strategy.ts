@@ -1,30 +1,33 @@
 import { Injectable } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
-import { Strategy, VerifyCallback } from 'passport-google-oauth20';
+import { Strategy, StrategyOptions, Profile } from 'passport-google-oauth20';
 import { UsersService } from '../users/users.service';
 
 @Injectable()
 export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
   constructor(private usersService: UsersService) {
-    super({
-      clientID: process.env.GOOGLE_CLIENT_ID,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      callbackURL: process.env.GOOGLE_CALLBACK_URL,
-      scope: ['email', 'profile'],
-    });
+    const clientID = process.env.GOOGLE_CLIENT_ID;
+    const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+    const callbackURL = process.env.GOOGLE_CALLBACK_URL;
+
+    if (!clientID || !clientSecret || !callbackURL) {
+      throw new Error('Missing Google OAuth environment variables');
+    }
+
+    super({ clientID, clientSecret, callbackURL, scope: ['email', 'profile'] } as StrategyOptions);
   }
 
   async validate(
     _accessToken: string,
     _refreshToken: string,
-    profile: any,
-    done: VerifyCallback,
+    profile: Profile,
   ) {
-    const user = await this.usersService.findOrCreateGoogle({
-      googleId: profile.id,
-      email: profile.emails[0].value,
-      name: profile.displayName,
-    });
-    done(null, user);
+    const email = profile.emails?.[0]?.value;
+    const name = profile.displayName;
+    const googleId = profile.id;
+
+    if (!email) throw new Error('No email from Google');
+
+    return this.usersService.findOrCreateGoogle({ googleId, email, name });
   }
 }
