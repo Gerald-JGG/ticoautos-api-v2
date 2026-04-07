@@ -11,7 +11,7 @@ export class User {
   @Prop({ required: true, unique: true, lowercase: true, trim: true })
   email: string;
 
-  @Prop({ required: true })
+  @Prop({ required: false, default: null })  // ← required: false para usuarios Google
   password: string;
 
   @Prop({ default: null })
@@ -19,6 +19,9 @@ export class User {
 
   @Prop({ required: false, trim: true })
   cedula: string;
+
+  @Prop({ default: null })  // ← agregar este campo
+  googleId: string;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);
