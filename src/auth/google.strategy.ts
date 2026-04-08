@@ -8,13 +8,18 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
   constructor(private usersService: UsersService) {
     const clientID = process.env.GOOGLE_CLIENT_ID;
     const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-    const callbackURL = process.env.GOOGLE_CALLBACK_URL;
+    const callbackURL = process.env.GOOGLE_CALLBACK_URL || 'http://localhost:3001/api/auth/google/callback';
 
-    if (!clientID || !clientSecret || !callbackURL) {
-      throw new Error('Missing Google OAuth environment variables');
+    if (!clientID || !clientSecret) {
+      throw new Error('Missing Google OAuth environment variables: GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are required');
     }
 
-    super({ clientID, clientSecret, callbackURL, scope: ['email', 'profile'] } as StrategyOptions);
+    super({ 
+      clientID, 
+      clientSecret, 
+      callbackURL, 
+      scope: ['email', 'profile'] 
+    } as StrategyOptions);
   }
 
   async validate(
