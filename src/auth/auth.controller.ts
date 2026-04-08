@@ -6,6 +6,7 @@ import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { GoogleAuthGuard } from '../common/guards/google-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import type { UserDocument } from '../users/user.schema';
+import type { Response } from 'express';
 
 @Controller('auth')
 export class AuthController {
@@ -46,19 +47,26 @@ export class AuthController {
 
   @Get('google/callback')
   @UseGuards(GoogleAuthGuard)
-  async googleCallback(@Req() req: any, @Res() res: any) {
-    const result = await this.authService.handleGoogleLogin(req.user);
+  async googleCallback(@Req() req: any, @Res() res: Response) {
+    try {
+      const result = await this.authService.handleGoogleLogin(req.user);
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
 
-    // Si no tiene cédula → completar perfil
-    if (!req.user.cedula) {
+      // Si no tiene cédula → completar perfil
+      if (!req.user.cedula) {
+        return res.redirect(
+          `${frontendUrl}/auth/complete-profile?token=${result.token}`
+        );
+      }
+
+      // Ya tiene cédula → ir al home
       return res.redirect(
-        `${process.env.FRONTEND_URL}/auth/complete-profile?token=${result.token}`
+        `${frontendUrl}/auth/google/success?token=${result.token}`
       );
+    } catch (error) {
+      console.error('Google callback error:', error);
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+      return res.redirect(`${frontendUrl}/auth/login?error=google_auth_failed`);
     }
-
-    // Ya tiene cédula → ir al home
-    return res.redirect(
-      `${process.env.FRONTEND_URL}/auth/google/success?token=${result.token}`
-    );
   }
 }
