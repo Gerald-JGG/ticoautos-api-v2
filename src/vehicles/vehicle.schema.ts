@@ -11,40 +11,40 @@ export enum VehicleStatus {
 @Schema({ timestamps: true })
 export class Vehicle {
   @Prop({ required: true, trim: true })
-  brand: string;
+  brand!: string;
 
   @Prop({ required: true, trim: true })
-  model: string;
+  model!: string;
 
   @Prop({ required: true })
-  year: number;
+  year!: number;
 
   @Prop({ required: true })
-  price: number;
+  price!: number;
 
   @Prop({ required: true, trim: true })
-  description: string;
+  description!: string;
 
   @Prop({ type: String, enum: VehicleStatus, default: VehicleStatus.AVAILABLE })
-  status: VehicleStatus;
+  status!: VehicleStatus;
 
   @Prop({ default: 0 })
-  mileage: number;
+  mileage!: number;
 
   @Prop({ trim: true })
-  color: string;
+  color!: string;
 
   @Prop({ trim: true })
-  transmission: string;
+  transmission!: string;
 
   @Prop({ trim: true })
-  fuel: string;
+  fuel!: string;
 
   @Prop({ type: [String], default: [] })
-  images: string[];
+  images!: string[];
 
   @Prop({ type: Types.ObjectId, ref: 'User', required: true })
-  owner: Types.ObjectId;
+  owner!: Types.ObjectId;
 }
 
 export const VehicleSchema = SchemaFactory.createForClass(Vehicle);
