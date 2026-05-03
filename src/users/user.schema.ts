@@ -17,7 +17,7 @@ export class User {
   @Prop({ default: null })
   phone!: string;
 
-  @Prop({ required: false, trim: true })
+  @Prop({ required: false, trim: true, unique: true, sparse: true })
   cedula!: string;
 
   @Prop({ default: null })
