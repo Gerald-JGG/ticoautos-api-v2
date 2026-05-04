@@ -1,4 +1,15 @@
-import { Controller, Post, Get, Body, HttpCode, HttpStatus, UseGuards, Req, Res } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Get,
+  Body,
+  Param,
+  HttpCode,
+  HttpStatus,
+  UseGuards,
+  Req,
+  Res,
+} from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { CreateUserDto } from '../users/dto/create-user.dto';
 import { LoginDto } from './dto/login.dto';
@@ -12,38 +23,77 @@ import type { Response } from 'express';
 export class AuthController {
   constructor(private authService: AuthService) {}
 
+  /**
+   * POST /api/auth/register
+   * Registro con email/password — queda en estado PENDING hasta verificar email
+   */
   @Post('register')
   async register(@Body() createUserDto: CreateUserDto) {
     return this.authService.register(createUserDto);
   }
 
+  /**
+   * POST /api/auth/login
+   * Login — bloqueado si el usuario está en estado PENDING
+   */
   @Post('login')
   @HttpCode(HttpStatus.OK)
   async login(@Body() loginDto: LoginDto) {
     return this.authService.login(loginDto);
   }
 
+  /**
+   * GET /api/auth/verify-email/:token
+   * Activa la cuenta del usuario y redirige al frontend
+   */
+  @Get('verify-email/:token')
+  async verifyEmail(@Param('token') token: string, @Res() res: Response) {
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    try {
+      const result = await this.authService.verifyEmail(token);
+      // Redirigir al login con mensaje de éxito
+      return res.redirect(
+        `${frontendUrl}/auth/login?verified=true&email=${encodeURIComponent(result.email)}`,
+      );
+    } catch (error: any) {
+      // Redirigir al frontend con error
+      return res.redirect(
+        `${frontendUrl}/auth/login?verified=false&error=${encodeURIComponent(error.message)}`,
+      );
+    }
+  }
+
+  /**
+   * GET /api/auth/me
+   * Retorna el usuario autenticado actual
+   */
   @UseGuards(JwtAuthGuard)
   @Get('me')
   getMe(@CurrentUser() user: UserDocument) {
     return user;
   }
 
+  /**
+   * POST /api/auth/complete-profile
+   * Completar perfil para usuarios que se registraron con Google
+   */
   @UseGuards(JwtAuthGuard)
   @Post('complete-profile')
   async completeProfile(
     @CurrentUser() user: UserDocument,
     @Body() body: { cedula: string; name: string },
   ) {
-    return this.authService.completeGoogleProfile(user._id.toString(), body.cedula, body.name);
+    return this.authService.completeGoogleProfile(
+      user._id.toString(),
+      body.cedula,
+      body.name,
+    );
   }
 
-  // ── Google OAuth ──────────────────────────────────────────────────
+  // ── Google OAuth ──────────────────────────────────────────────────────────
   @Get('google')
   @UseGuards(GoogleAuthGuard)
-  googleLogin() {
-    // Passport redirige automáticamente a Google
-  }
+  googleLogin() {}
 
   @Get('google/callback')
   @UseGuards(GoogleAuthGuard)
@@ -52,16 +102,14 @@ export class AuthController {
       const result = await this.authService.handleGoogleLogin(req.user);
       const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
 
-      // Si no tiene cédula → completar perfil
       if (!req.user.cedula) {
         return res.redirect(
-          `${frontendUrl}/auth/complete-profile?token=${result.token}`
+          `${frontendUrl}/auth/complete-profile?token=${result.token}`,
         );
       }
 
-      // Ya tiene cédula → ir al home
       return res.redirect(
-        `${frontendUrl}/auth/google/success?token=${result.token}`
+        `${frontendUrl}/auth/google/success?token=${result.token}`,
       );
     } catch (error) {
       console.error('Google callback error:', error);
