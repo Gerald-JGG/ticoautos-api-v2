@@ -1,4 +1,4 @@
-import { IsEmail, IsString, MinLength, IsOptional, Matches } from 'class-validator';
+import { IsEmail, IsString, MinLength, Matches } from 'class-validator';
 
 export class CreateUserDto {
   @IsString()
@@ -15,7 +15,7 @@ export class CreateUserDto {
   @Matches(/^\d{9}$/, { message: 'Cédula must be exactly 9 digits' })
   cedula: string;
 
-  @IsOptional()
   @IsString()
-  phone?: string;
+  @MinLength(8, { message: 'El teléfono debe tener al menos 8 dígitos' })
+  phone: string;
 }
