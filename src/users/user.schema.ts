@@ -19,7 +19,7 @@ export class User {
   @Prop({ required: false, default: null })
   password!: string;
 
-  @Prop({ default: null })
+  @Prop({ required: false, trim: true })
   phone!: string;
 
   @Prop({ required: false, trim: true, unique: true, sparse: true })
@@ -28,25 +28,35 @@ export class User {
   @Prop({ default: null })
   googleId!: string;
 
-  // Estado de la cuenta: pending = esperando verificación, active = verificado
   @Prop({ type: String, enum: UserStatus, default: UserStatus.PENDING })
   status!: UserStatus;
 
-  // Token único para verificar el correo
   @Prop({ default: null })
   verificationToken!: string;
 
-  // Expiración del token (24 horas)
   @Prop({ default: null })
   verificationTokenExpires!: Date;
+
+  // ── 2FA fields ────────────────────────────────────────────────────────────
+  @Prop({ default: null })
+  twoFactorCode!: string;
+
+  @Prop({ default: null })
+  twoFactorExpires!: Date;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);
 
 UserSchema.set('toJSON', {
   transform: (_doc, ret) => {
-    // Nunca exponer password ni tokens de verificación
-    const { password, verificationToken, verificationTokenExpires, ...rest } = ret;
+    const {
+      password,
+      verificationToken,
+      verificationTokenExpires,
+      twoFactorCode,
+      twoFactorExpires,
+      ...rest
+    } = ret;
     return rest;
   },
 });
