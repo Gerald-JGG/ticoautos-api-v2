@@ -8,6 +8,7 @@ import { GoogleStrategy } from './google.strategy';
 import { UsersModule } from '../users/users.module';
 import { CedulaModule } from '../cedula/cedula.module';
 import { EmailModule } from '../email/email.module';
+import { SmsModule } from '../sms/sms.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { EmailModule } from '../email/email.module';
     PassportModule,
     CedulaModule,
     EmailModule,
+    SmsModule,
     JwtModule.register({
       secret: process.env.JWT_SECRET || 'secret',
       signOptions: { expiresIn: '7d' },
