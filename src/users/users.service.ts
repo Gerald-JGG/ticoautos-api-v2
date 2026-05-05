@@ -11,27 +11,17 @@ export class UsersService {
   constructor(@InjectModel(User.name) private userModel: Model<UserDocument>) {}
 
   async create(createUserDto: CreateUserDto): Promise<UserDocument> {
-    // Verificar email único
     const existingEmail = await this.userModel.findOne({
       email: createUserDto.email.toLowerCase(),
     });
-    if (existingEmail) {
-      throw new ConflictException('El correo electrónico ya está registrado');
-    }
+    if (existingEmail) throw new ConflictException('El correo electrónico ya está registrado');
 
-    // Verificar cédula única
-    const existingCedula = await this.userModel.findOne({
-      cedula: createUserDto.cedula,
-    });
-    if (existingCedula) {
-      throw new ConflictException('La cédula ya está registrada en el sistema');
-    }
+    const existingCedula = await this.userModel.findOne({ cedula: createUserDto.cedula });
+    if (existingCedula) throw new ConflictException('La cédula ya está registrada en el sistema');
 
     const hashedPassword = await bcrypt.hash(createUserDto.password, 10);
-
-    // Generar token de verificación único (64 chars hex)
     const verificationToken = crypto.randomBytes(32).toString('hex');
-    const verificationTokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h
+    const verificationTokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
     const user = new this.userModel({
       ...createUserDto,
@@ -40,7 +30,6 @@ export class UsersService {
       verificationToken,
       verificationTokenExpires,
     });
-
     return user.save();
   }
 
@@ -57,21 +46,59 @@ export class UsersService {
   async findByVerificationToken(token: string): Promise<UserDocument | null> {
     return this.userModel.findOne({
       verificationToken: token,
-      verificationTokenExpires: { $gt: new Date() }, // token no expirado
+      verificationTokenExpires: { $gt: new Date() },
     });
   }
 
   async activateUser(userId: string): Promise<UserDocument> {
     const user = await this.userModel.findByIdAndUpdate(
       userId,
-      {
-        status: UserStatus.ACTIVE,
-        verificationToken: null,
-        verificationTokenExpires: null,
-      },
+      { status: UserStatus.ACTIVE, verificationToken: null, verificationTokenExpires: null },
       { new: true },
     );
     if (!user) throw new NotFoundException('User not found');
+    return user;
+  }
+
+  // ── 2FA methods ───────────────────────────────────────────────────────────
+
+  /**
+   * Genera un código 2FA de 6 dígitos, lo guarda en la DB con expiración de 10 min
+   * y devuelve el código para que el servicio lo envíe por SMS.
+   */
+  async generateTwoFactorCode(userId: string): Promise<string> {
+    // Código numérico de 6 dígitos
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const expires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutos
+
+    await this.userModel.findByIdAndUpdate(userId, {
+      twoFactorCode: code,
+      twoFactorExpires: expires,
+    });
+
+    return code;
+  }
+
+  /**
+   * Verifica el código 2FA. Si es correcto lo limpia de la DB y devuelve el usuario.
+   */
+  async verifyTwoFactorCode(
+    userId: string,
+    code: string,
+  ): Promise<UserDocument | null> {
+    const user = await this.userModel.findOne({
+      _id: userId,
+      twoFactorCode: code,
+      twoFactorExpires: { $gt: new Date() },
+    });
+
+    if (!user) return null;
+
+    // Limpiar el código usado
+    user.twoFactorCode = null as any;
+    user.twoFactorExpires = null as any;
+    await user.save();
+
     return user;
   }
 
@@ -80,39 +107,29 @@ export class UsersService {
     email: string;
     name: string;
   }): Promise<UserDocument> {
-    // Buscar por googleId
     let user = await this.userModel.findOne({ googleId: profile.googleId });
     if (user) return user;
 
-    // Buscar por email y vincular googleId
     user = await this.userModel.findOne({ email: profile.email });
     if (user) {
       user.googleId = profile.googleId;
-      // Si se registró con Google, activar directamente (Google ya verificó el email)
       user.status = UserStatus.ACTIVE;
       return user.save();
     }
 
-    // Crear nuevo usuario Google — activo de inmediato (Google verifica el email)
     const newUser = new this.userModel({
       googleId: profile.googleId,
       email: profile.email,
       name: profile.name,
       password: null,
-      status: UserStatus.ACTIVE, // Google ya verificó el email
+      status: UserStatus.ACTIVE,
     });
     return newUser.save();
   }
 
   async updateCedula(userId: string, cedula: string, name: string): Promise<UserDocument> {
-    // Verificar cédula única (excluyendo el usuario actual)
-    const existingCedula = await this.userModel.findOne({
-      cedula,
-      _id: { $ne: userId },
-    });
-    if (existingCedula) {
-      throw new ConflictException('La cédula ya está registrada en el sistema');
-    }
+    const existingCedula = await this.userModel.findOne({ cedula, _id: { $ne: userId } });
+    if (existingCedula) throw new ConflictException('La cédula ya está registrada en el sistema');
 
     const user = await this.userModel.findById(userId);
     if (!user) throw new NotFoundException('User not found');
