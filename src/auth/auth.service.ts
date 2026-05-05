@@ -10,6 +10,7 @@ import { CreateUserDto } from '../users/dto/create-user.dto';
 import { LoginDto } from './dto/login.dto';
 import { CedulaService } from '../cedula/cedula.service';
 import { EmailService } from '../email/email.service';
+import { SmsService } from '../sms/sms.service';
 import { UserStatus } from '../users/user.schema';
 import type { UserDocument } from '../users/user.schema';
 
@@ -20,44 +21,38 @@ export class AuthService {
     private jwtService: JwtService,
     private cedulaService: CedulaService,
     private emailService: EmailService,
+    private smsService: SmsService,
   ) {}
 
   async register(createUserDto: CreateUserDto) {
-    // 1. Validar cédula en el padrón (también valida mayoría de edad)
     await this.cedulaService.validate(createUserDto.cedula);
-
-    // 2. Crear usuario en estado PENDING con token de verificación
     const user = await this.usersService.create(createUserDto);
-
-    // 3. Enviar correo de verificación
     await this.emailService.sendVerificationEmail(
       user.email,
       user.name,
       user.verificationToken,
     );
-
     return {
-      message:
-        'Registro exitoso. Revisá tu correo para activar tu cuenta antes de ingresar.',
+      message: 'Registro exitoso. Revisá tu correo para activar tu cuenta.',
       email: user.email,
     };
   }
 
   async verifyEmail(token: string) {
     const user = await this.usersService.findByVerificationToken(token);
-
     if (!user) {
       throw new BadRequestException(
-        'El enlace de verificación es inválido o ya expiró. Registrate de nuevo.',
+        'El enlace de verificación es inválido o ya expiró.',
       );
     }
-
     await this.usersService.activateUser(user._id.toString());
-
-    // Redirigir al frontend con éxito
     return { success: true, email: user.email };
   }
 
+  /**
+   * Login paso 1: validar credenciales y enviar código 2FA por SMS.
+   * NO devuelve el JWT aún — solo un indicador de que se envió el SMS.
+   */
   async login(loginDto: LoginDto) {
     const user = await this.usersService.findByEmail(loginDto.email);
     if (!user) throw new UnauthorizedException('Credenciales inválidas');
@@ -65,10 +60,38 @@ export class AuthService {
     const isPasswordValid = await bcrypt.compare(loginDto.password, user.password);
     if (!isPasswordValid) throw new UnauthorizedException('Credenciales inválidas');
 
-    // Bloquear login si la cuenta está pendiente de verificación
     if (user.status === UserStatus.PENDING) {
       throw new UnauthorizedException(
         'Tu cuenta aún no está verificada. Revisá tu correo y hacé click en el enlace de activación.',
+      );
+    }
+
+    if (!user.phone) {
+      throw new UnauthorizedException(
+        'No tenés número de teléfono registrado. Contactá soporte.',
+      );
+    }
+
+    // Generar código 2FA y enviarlo por SMS
+    const code = await this.usersService.generateTwoFactorCode(user._id.toString());
+    await this.smsService.sendTwoFactorCode(user.phone, code);
+
+    return {
+      requires2FA: true,
+      userId: user._id.toString(),
+      message: `Código de verificación enviado al número terminado en ${user.phone.slice(-4)}`,
+    };
+  }
+
+  /**
+   * Login paso 2: verificar código 2FA y devolver JWT.
+   */
+  async verifyTwoFactor(userId: string, code: string) {
+    const user = await this.usersService.verifyTwoFactorCode(userId, code);
+
+    if (!user) {
+      throw new UnauthorizedException(
+        'Código incorrecto o expirado. Intentá iniciar sesión de nuevo.',
       );
     }
 
@@ -77,7 +100,6 @@ export class AuthService {
   }
 
   async handleGoogleLogin(user: UserDocument) {
-    // Usuarios de Google siempre están activos (Google ya verificó el email)
     const token = this.generateToken(user._id.toString(), user.email);
     return { user, token };
   }
